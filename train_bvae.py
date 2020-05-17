@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
 import numpy as np
 
-from models.BVAE import BetaVAE_H, BetaVAE_H
+from models.BVAE import BetaVAE_H, BetaVAE_B
 from dataset import CustomDataset
 from options import TrainOptions
 
@@ -50,19 +50,19 @@ class Trainer(object):
         self.decoder_dist = "gaussian"
 
         if args.model == "H":
-            net = BetaVAE_H()
+            net = BetaVAE_H
         elif args.model == "B":
-            net = BetaVAE_B()
-        
+            net = BetaVAE_B
+
         else:
             raise NotImplementedError("only support model H or B")
 
-        self.net = cuda(net(self.z_dim,self.nc), self.use_cuda)
+        self.net = cuda(net(self.nc, self.z_dim), self.use_cuda)
         self.optim = optim.Adam(
             self.net.parameters(), lr=self.lr, betas=(self.beta1, self.beta2)
         )
 
-        self.ckpt_dir = os.path.join(args.ckpt_dir, args.viz_name)
+        self.ckpt_dir = os.path.join(args.ckpt_dir, "ckpt")
         if not os.path.exists(self.ckpt_dir):
             os.makedirs(self.ckpt_dir, exist_ok=True)
         self.ckpt_name = args.ckpt_name
@@ -70,7 +70,7 @@ class Trainer(object):
             self.load_checkpoint(self.ckpt_name)
 
         self.save_output = args.save_output
-        self.output_dir = os.path.join(args.output_dir, args.viz_name)
+        self.output_dir = os.path.join(args.output_dir, "output")
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir, exist_ok=True)
 
@@ -158,20 +158,35 @@ class Trainer(object):
                     if self.objective == "B":
                         pbar.write("C:{:.3f}".format(C.item()))
 
-                    #import pdb; pdb.set_trace()
-                    print('adding scalars')
-                    writer.add_scalars(
-                        "values",
-                        {
-                            "mu": mu.mean().item(),
-                            "var": logvar.exp().mean().item(),
-                            "recon_loss": recon_loss.item(),
-                            "total_kld": total_kld.item(),
-                            #"dim_wise_kld": dim_wise_kld.item(),
-                            "mean_kld": mean_kld.item(),
-                        },
-                        self.global_iter,
+                    writer.add_scalar(
+                        "reconstruction loss", recon_loss.item(), self.global_iter
                     )
+                    dim_wise_kld_dict = np.array(
+                        [[str(i), value.item()] for i, value in enumerate(dim_wise_kld)]
+                    )
+                    kl_dict = dict(
+                        zip(
+                            dim_wise_kld_dict[:, 0],
+                            np.around(dim_wise_kld_dict[:, 1].astype(np.float), 4),
+                        )
+                    )
+                    kl_dict["total_kld"] = total_kld.item()
+                    kl_dict["mean_kld"] = mean_kld.item()
+                    # print(kl_dict.keys(),kl_dict.values())
+                    writer.add_scalars("kl divergence", kl_dict, self.global_iter)
+                    var_dict = np.array(
+                        [
+                            [str(i), value.item()]
+                            for i, value in enumerate(logvar.exp().mean(0))
+                        ]
+                    )
+                    var_dict = dict(
+                        zip(
+                            var_dict[:, 0],
+                            np.around(var_dict[:, 1].astype(np.float), 4),
+                        )
+                    )
+                    writer.add_scalars("posterior variance", var_dict, self.global_iter)
 
                 if self.global_iter % self.save_step == 0:
                     self.save_checkpoint("last")
@@ -201,6 +216,7 @@ class Trainer(object):
             )
         pbar.write("[Training Finished]")
         pbar.close()
+        writer.close()
 
     def net_mode(self, train):
         if not isinstance(train, bool):

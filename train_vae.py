@@ -79,7 +79,7 @@ def train_model(
         data_stream = tqdm(enumerate(data_loader, 1))
 
         for batch_index, (x, _) in data_stream:
-            # where are we?
+     
             iteration = (epoch - 1) * (len(dataset) // batch_size) + batch_index
 
             # prepare data on gpu if needed
@@ -119,16 +119,11 @@ def train_model(
             )
 
             if iteration % loss_log_interval == 0:
-
-                writer.add_scalars(
-                    "losses",
-                    {
-                        "reconstruction": reconstruction_loss.item(),
-                        "kl divergence": kl_divergence_loss.item(),
-                        "total": total_loss.item(),
-                    },
-                    iteration,
+                writer.add_scalar(
+                    "reconstruction loss", reconstruction_loss.item(), iteration
                 )
+                writer.add_scalar("kl divergence", kl_divergence_loss.item(), iteration)
+                writer.add_scalar("total loss", total_loss.item(), iteration)
 
         print("#epoch checkpoint!", epoch)
         # save the checkpoint.

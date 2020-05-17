@@ -8,13 +8,11 @@ import torch.nn.init as init
 class BetaVAE_H(nn.Module):
     """Model proposed in original beta-VAE paper(Higgins et al, ICLR, 2017)."""
 
-    def __init__(self, label, image_size, channel_num=3, kernel_num=128, z_size=10):
+    def __init__(self, channel_num=3, z_size=10):
         super(BetaVAE_H, self).__init__()
 
-        self.label = label
-        self.image_size = image_size
         self.channel_num = channel_num
-        self.kernel_num = kernel_num
+
         self.z_size = z_size
 
         self.encoder = nn.Sequential(
@@ -121,13 +119,13 @@ class View(nn.Module):
 class BetaVAE_B(BetaVAE_H):
     """Model proposed in understanding beta-VAE paper(Burgess et al, arxiv:1804.03599, 2018)."""
 
-    def __init__(self, z_dim=10, nc=1):
+    def __init__(self, channel_num=1,z_dim=10):
         super(BetaVAE_B, self).__init__()
-        self.nc = nc
+        self.nc =channel_num
         self.z_dim = z_dim
 
         self.encoder = nn.Sequential(
-            nn.Conv2d(nc, 32, 4, 2, 1),          # B,  32, 32, 32
+            nn.Conv2d(self.nc, 32, 4, 2, 1),          # B,  32, 32, 32
             nn.ReLU(True),
             nn.Conv2d(32, 32, 4, 2, 1),          # B,  32, 16, 16
             nn.ReLU(True),
@@ -157,7 +155,7 @@ class BetaVAE_B(BetaVAE_H):
             nn.ReLU(True),
             nn.ConvTranspose2d(32, 32, 4, 2, 1), # B,  32, 32, 32
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, nc, 4, 2, 1), # B,  nc, 64, 64
+            nn.ConvTranspose2d(32, self.nc, 4, 2, 1), # B,  nc, 64, 64
         )
         self.weight_init()
 
@@ -166,16 +164,20 @@ class BetaVAE_B(BetaVAE_H):
             for m in self._modules[block]:
                 kaiming_init(m)
 
+    def q(self, encoded):
+        return encoded[:, :self.z_size], encoded[:, self.z_size:]
+    def z(self,mean, logvar):
+        std = logvar.div(2).exp()
+        eps = Variable(std.data.new(std.size()).normal_())
+        return mean + std*eps
     def forward(self, x):
-        distributions = self.encoder(x)
-        mu = distributions[:, :self.z_dim]
-        logvar = distributions[:, self.z_dim:]
-        z = reparametrize(mu, logvar)
+        encoded = self.encoder(x)
+        mean, logvar = self.q(encoded)
+        z = self.z(mean, logvar)
         x_recon = self.decoder(z).view(x.size())
+        return mean, logvar, x_recon
 
-        return x_recon, mu, logvar
-
-  
+     
 
 def kaiming_init(m):
     if isinstance(m, (nn.Linear, nn.Conv2d)):
