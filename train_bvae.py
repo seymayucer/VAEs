@@ -48,7 +48,7 @@ class Trainer(object):
         self.beta2 = args.beta2
         self.nc = 3
         self.decoder_dist = "gaussian"
-
+  
         if args.model == "H":
             net = BetaVAE_H
         elif args.model == "B":
@@ -174,6 +174,7 @@ class Trainer(object):
                     kl_dict["mean_kld"] = mean_kld.item()
                     # print(kl_dict.keys(),kl_dict.values())
                     writer.add_scalars("kl divergence", kl_dict, self.global_iter)
+
                     var_dict = np.array(
                         [
                             [str(i), value.item()]
@@ -199,12 +200,14 @@ class Trainer(object):
                     out = True
                     break
             print("epoch is done", i, ep_no)
-            # writer.add_scalars('losses', {'reconstruction':epoch_recon_loss,
-            #                                   'mean kl divergence':epoch_mean_kld,
-            #                                   'total kl divergence': epoch_total_kld}, ep_no)
-
-            self.save_images(x, F.sigmoid(x_recon).data, ep_no)
-
+           
+            
+            
+            x_grid = make_grid(x)
+            reconstructed_grid = make_grid(F.sigmoid(x_recon))
+            writer.add_image('original images', x_grid, ep_no)
+            writer.add_image('reconstructed images', reconstructed_grid, ep_no)
+            self.traverse()
             ep_no += 1
             epoch_recon_loss /= i
             epoch_total_kld /= i
@@ -216,7 +219,68 @@ class Trainer(object):
             )
         pbar.write("[Training Finished]")
         pbar.close()
+        
         writer.close()
+
+    def traverse(self, limit=3, inter=2/3, loc=-1):
+        self.net_mode(train=False)
+        import random
+
+        decoder = self.net.decoder
+        encoder = self.net.encoder
+        interpolation = torch.arange(-limit, limit+0.1, inter)
+
+        n_dsets = len(self.data_loader.dataset)
+        rand_idx = random.randint(1, n_dsets-1)
+
+        random_img,_ = self.data_loader.dataset.__getitem__(rand_idx)
+        random_img = Variable(cuda(random_img, self.use_cuda), volatile=True).unsqueeze(0)
+        random_img_z = encoder(random_img)[:, :self.z_dim]
+
+        random_z = Variable(cuda(torch.rand(1, self.z_dim), self.use_cuda), volatile=True)
+
+        
+        fixed_idx = 0
+        fixed_img,_ = self.data_loader.dataset.__getitem__(fixed_idx)
+        fixed_img = Variable(cuda(fixed_img, self.use_cuda), volatile=True).unsqueeze(0)
+        fixed_img_z = encoder(fixed_img)[:, :self.z_dim]
+
+        Z = {'fixed_img':fixed_img_z, 'random_img':random_img_z, 'random_z':random_z}
+
+        gifs = []
+        for key in Z.keys():
+            z_ori = Z[key]
+            samples = []
+            for row in range(self.z_dim):
+                if loc != -1 and row != loc:
+                    continue
+                z = z_ori.clone()
+                for val in interpolation:
+                    z[:, row] = val
+                    sample = F.sigmoid(decoder(z)).data
+                    samples.append(sample)
+                    gifs.append(sample)
+            samples = torch.cat(samples, dim=0).cpu()
+            title = '{}_latent_traversal(iter:{})'.format(key, self.global_iter)
+
+            
+            writer.add_images('traversal images',samples, len(interpolation))
+
+        # if self.save_output:
+        #     output_dir = os.path.join(self.output_dir, str(self.global_iter))
+        #     os.makedirs(output_dir, exist_ok=True)
+        #     gifs = torch.cat(gifs)
+        #     gifs = gifs.view(len(Z), self.z_dim, len(interpolation), self.nc, 64, 64).transpose(1, 2)
+        #     for i, key in enumerate(Z.keys()):
+        #         for j, val in enumerate(interpolation):
+        #             save_image(tensor=gifs[i][j].cpu(),
+        #                        fp=os.path.join(output_dir, '{}_{}.jpg'.format(key, j)),
+        #                        nrow=self.z_dim, pad_value=1)
+
+        #         grid2gif(os.path.join(output_dir, key+'*.jpg'),
+        #                  os.path.join(output_dir, key+'.gif'), delay=10)
+
+        self.net_mode(train=True)
 
     def net_mode(self, train):
         if not isinstance(train, bool):

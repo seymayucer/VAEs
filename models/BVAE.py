@@ -8,12 +8,12 @@ import torch.nn.init as init
 class BetaVAE_H(nn.Module):
     """Model proposed in original beta-VAE paper(Higgins et al, ICLR, 2017)."""
 
-    def __init__(self, channel_num=3, z_size=10):
+    def __init__(self, channel_num=1,z_dim=32):
         super(BetaVAE_H, self).__init__()
 
         self.channel_num = channel_num
 
-        self.z_size = z_size
+        self.z_dim = z_dim
 
         self.encoder = nn.Sequential(
             nn.Conv2d(self.channel_num, 32, 4, 2, 1), # B,  32, 32, 32
@@ -27,10 +27,10 @@ class BetaVAE_H(nn.Module):
             nn.Conv2d(64, 256, 4, 1),            # B, 256,  1,  1
             nn.ReLU(),
             View((-1, 256*1*1)),                 # B, 256
-            nn.Linear(256, self.z_size*2),       # B, z_dim*2
+            nn.Linear(256, self.z_dim*2),       # B, z_dim*2
         )
         self.decoder = nn.Sequential(
-            nn.Linear(self.z_size, 256),               # B, 256
+            nn.Linear(self.z_dim, 256),               # B, 256
             View((-1, 256, 1, 1)),               # B, 256,  1,  1
             nn.ReLU(),
             nn.ConvTranspose2d(256, 64, 4),      # B,  64,  4,  4
@@ -60,7 +60,7 @@ class BetaVAE_H(nn.Module):
         return mean, logvar, x_reconstructed
 
     def q(self, encoded):
-        return encoded[:, :self.z_size], encoded[:, self.z_size:]
+        return encoded[:, :self.z_dim], encoded[:, self.z_dim:]
 
     def z(self,mean, logvar):
         std = logvar.div(2).exp()
@@ -95,17 +95,8 @@ class BetaVAE_H(nn.Module):
         mean_kld = klds.mean(1).mean(0, True)
 
         return total_kld, dimension_wise_kld, mean_kld
-    # def sample(self, size):
-    #     z = Variable(
-    #         torch.randn(size, self.z_size).cuda() if self._is_on_cuda() else
-    #         torch.randn(size, self.z_size)
-    #     )
-    #     z_projected = self.project(z).view(
-    #         -1, self.kernel_num,
-    #         self.feature_size,
-    #         self.feature_size,
-    #     )
-    #     return self.decoder(z_projected).data
+
+
 class View(nn.Module):
     def __init__(self, size):
         super(View, self).__init__()
@@ -119,7 +110,7 @@ class View(nn.Module):
 class BetaVAE_B(BetaVAE_H):
     """Model proposed in understanding beta-VAE paper(Burgess et al, arxiv:1804.03599, 2018)."""
 
-    def __init__(self, channel_num=1,z_dim=10):
+    def __init__(self, channel_num=1,z_dim=32):
         super(BetaVAE_B, self).__init__()
         self.nc =channel_num
         self.z_dim = z_dim
@@ -165,7 +156,7 @@ class BetaVAE_B(BetaVAE_H):
                 kaiming_init(m)
 
     def q(self, encoded):
-        return encoded[:, :self.z_size], encoded[:, self.z_size:]
+        return encoded[:, :self.z_dim], encoded[:, self.z_dim:]
     def z(self,mean, logvar):
         std = logvar.div(2).exp()
         eps = Variable(std.data.new(std.size()).normal_())
@@ -173,6 +164,7 @@ class BetaVAE_B(BetaVAE_H):
     def forward(self, x):
         encoded = self.encoder(x)
         mean, logvar = self.q(encoded)
+    
         z = self.z(mean, logvar)
         x_recon = self.decoder(z).view(x.size())
         return mean, logvar, x_recon

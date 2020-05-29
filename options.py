@@ -19,9 +19,9 @@ class TrainOptions():
         parser.add_argument('--seed', default=1, type=int, help='random seed')
         parser.add_argument('--cuda', default=True, type=str2bool, help='enable cuda')
         parser.add_argument('--max_iter', default=1e6, type=float, help='maximum training iteration')
-        parser.add_argument('--batch_size', default=64, type=int, help='batch size')
+        parser.add_argument('--batch_size', default=16, type=int, help='batch size')
 
-        parser.add_argument('--z_dim', default=10, type=int, help='dimension of the representation z')
+        parser.add_argument('--z_dim', default=32, type=int, help='dimension of the representation z')
         parser.add_argument('--beta', default=4, type=float, help='beta parameter for KL-term in original beta-VAE')
         parser.add_argument('--objective', default='H', type=str, help='beta-vae objective proposed in Higgins et al. or Burgess et al. H/B')
         parser.add_argument('--model', default='H', type=str, help='model proposed in Higgins et al. or Burgess et al. H/B')
@@ -41,10 +41,10 @@ class TrainOptions():
         parser.add_argument('--output_dir', default='outputs', type=str, help='output directory')
 
         parser.add_argument('--display_step', default=100, type=int, help='number of iterations after which loss data is printed and visdom is updated')
-        parser.add_argument('--save_step', default=10000, type=int, help='number of iterations after which a checkpoint is saved')
+        parser.add_argument('--save_step', default=100, type=int, help='number of iterations after which a checkpoint is saved')
 
         parser.add_argument('--ckpt_dir', default='checkpoints', type=str, help='checkpoint directory')
-        parser.add_argument('--ckpt_name', default='last', type=str, help='load previous checkpoint. insert checkpoint filename')
+        parser.add_argument('--ckpt_name', default='last_horn', type=str, help='load previous checkpoint. insert checkpoint filename')
         parser.add_argument('--dset_dir', default='../FaceDatasets/VGGFace2/aligned_train', type=str, help='dataset directory')
         parser.add_argument('--csv_file', default='../FaceDatasets/metadata/train_500_image_data.csv', type=str, help='dataset name')
         parser.add_argument('--test_csv_file', default='../FaceDatasets/metadata/val_500_image_data.csv', type=str, help='dataset name')
