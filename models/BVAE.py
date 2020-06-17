@@ -53,6 +53,7 @@ class BetaVAE_H(nn.Module):
 
     def forward(self, x):
         encoded = self.encoder(x)
+        import pdb; pdb.set_trace();
         mean, logvar = self.q(encoded)
         z = self.z(mean, logvar)
         x_reconstructed = self.decoder(z)

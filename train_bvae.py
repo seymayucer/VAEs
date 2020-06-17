@@ -18,6 +18,7 @@ from torchvision.utils import make_grid
 import numpy as np
 
 from models.BVAE import BetaVAE_H, BetaVAE_B
+from models.BRVAE import BRES_VAE
 from dataset import CustomDataset
 from options import TrainOptions
 
@@ -53,7 +54,8 @@ class Trainer(object):
             net = BetaVAE_H
         elif args.model == "B":
             net = BetaVAE_B
-
+        elif args.model == 'R':
+            net = BRES_VAE
         else:
             raise NotImplementedError("only support model H or B")
 
@@ -114,6 +116,7 @@ class Trainer(object):
 
                 x = Variable(cuda(x, self.use_cuda))
                 mu, logvar, x_recon = self.net(x)
+                #import pdb;pdb.set_trace();
                 recon_loss = self.net.reconstruction_loss(x, x_recon, self.decoder_dist)
                 total_kld, dim_wise_kld, mean_kld = self.net.kl_divergence_loss(
                     mu, logvar
